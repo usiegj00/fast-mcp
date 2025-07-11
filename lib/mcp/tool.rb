@@ -161,7 +161,7 @@ module FastMcp
       end
     end
 
-    def initialize(headers: {})
+    attr_accessor :context    def initialize(headers: {})
       @_meta = {}
       @headers = headers
     end
@@ -194,6 +194,13 @@ module FastMcp
     end
 
     def call_with_schema_validation!(**args)
+      # Get context from thread-local storage
+      if Thread.current[:mcp_oauth_context]
+        @context = Thread.current[:mcp_oauth_context]
+      else
+        @context ||= {}
+      end
+      
       arg_validation = self.class.input_schema.call(args)
       raise InvalidArgumentsError, arg_validation.errors.to_h.to_json if arg_validation.errors.any?
 

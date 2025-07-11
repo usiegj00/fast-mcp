@@ -15,7 +15,7 @@ module FastMcp
     include ServerFiltering
 
     attr_reader :name, :version, :tools, :resources, :capabilities
-
+    attr_accessor :oauth_context
     DEFAULT_CAPABILITIES = {
       resources: {
         subscribe: true,
@@ -148,6 +148,34 @@ module FastMcp
 
     # Handle incoming JSON-RPC request
     def handle_request(json_str, headers: {}) # rubocop:disable Metrics/MethodLength
+      # Extract OAuth token info from headers if present
+      if headers['oauth-token-info']
+        begin
+          token_info = JSON.parse(headers['oauth-token-info'], symbolize_names: true)
+          
+          # Reconstruct user object from user_id if available
+          if token_info[:user_id] && defined?(User)
+            token_info[:user] = User.find(token_info[:user_id])
+          end
+          
+          # Store OAuth context to be used by tools
+          @oauth_context = {
+            oauth_validation: token_info,
+            user: token_info[:user]
+          }
+          
+          # Also store in thread-local storage for tools to access
+          Thread.current[:mcp_oauth_context] = @oauth_context
+        rescue => e
+          @logger.error("Failed to parse OAuth token info: #{e.message}")
+          @oauth_context = nil
+          Thread.current[:mcp_oauth_context] = nil
+        end
+      else
+        @oauth_context = nil
+        Thread.current[:mcp_oauth_context] = nil
+      end
+      
       begin
         request = JSON.parse(json_str)
       rescue JSON::ParserError, TypeError

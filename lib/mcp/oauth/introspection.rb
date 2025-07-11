@@ -216,6 +216,45 @@ module FastMcp
 
         # Get token information locally
         def token_info(token, token_type_hint: nil)
+          @logger.debug('Local introspection for token')
+          
+          # Check if we have an opaque token validator
+          if @token_validator.instance_variable_get(:@opaque_token_validator)
+            # Handle opaque tokens with custom validator
+            begin
+              result = @token_validator.instance_variable_get(:@opaque_token_validator).call(token)
+              if result && result[:valid]
+                # Convert our custom validator result to introspection format
+                introspection_result = {
+                  'active' => true,
+                  'scope' => result[:scopes].join(' '),
+                  'sub' => result[:subject],
+                  'client_id' => result[:client_id],
+                  'exp' => result[:expires_at]&.to_i,
+                  'token_type' => 'Bearer'
+                }
+                @logger.debug("Local introspection result: #{introspection_result.inspect}")
+                
+                # Return in expected format
+                return {
+                  subject: result[:subject],
+                  scopes: result[:scopes],
+                  client_id: result[:client_id],
+                  expires_at: result[:expires_at],
+                  token_type: 'Bearer',
+                  user: result[:user]
+                }
+              else
+                # Return nil for inactive token
+                return nil
+              end
+            rescue => e
+              @logger.error("Opaque token validation failed: #{e.message}")
+              return nil
+            end
+          end
+          
+          # Fall back to original behavior
           result = introspect_token(token, token_type_hint)
 
           return nil unless result['active']

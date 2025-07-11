@@ -69,19 +69,32 @@ module FastMcp
 
         # Add OAuth token info to headers for server processing
         if @oauth_enabled && @token_info
+          # Pass the token_info with user_id instead of full user object
+          token_info_for_headers = @token_info.dup
+          if @token_info[:user]
+            token_info_for_headers[:user_id] = @token_info[:user].id
+            token_info_for_headers.delete(:user) # Remove the ActiveRecord object
+          end
+          
+          headers['oauth-token-info'] = token_info_for_headers.to_json
           headers['oauth-subject'] = @token_info[:subject]
           headers['oauth-scopes'] = @token_info[:scopes].join(' ')
           headers['oauth-client-id'] = @token_info[:client_id] if @token_info[:client_id]
         end
 
         # Handle the request
-        response = server.handle_request(body, headers: headers)
+        begin
+          response = server.handle_request(body, headers: headers)
 
-        # Determine response handling
-        if response.nil? || response.empty?
-          [202, { 'Content-Type' => JSON_CONTENT_TYPE }, ['']]
-        else
-          handle_json_rpc_response(response, request)
+          # Determine response handling
+          if response.nil? || response.empty?
+            [202, { 'Content-Type' => JSON_CONTENT_TYPE }, ['']]
+          else
+            handle_json_rpc_response(response, request)
+          end
+        ensure
+          # Clean up thread-local storage after processing is complete
+          Thread.current[:mcp_oauth_context] = nil
         end
       end
 
@@ -103,10 +116,15 @@ module FastMcp
       end
 
       # Check if current token has required scope
-      def required_scope?(required_scope)
-        return true unless @oauth_enabled || !@token_info
-
-        @token_info[:scopes].include?(required_scope)
+      def required_scope?(scope)
+        return false unless @oauth_enabled && @token_info
+        
+        # Handle both string and array scopes
+        required_scopes = scope.is_a?(Array) ? scope : [scope]
+        token_scopes = @token_info[:scopes] || []
+        
+        # Check if token has any of the required scopes
+        required_scopes.any? { |s| token_scopes.include?(s) }
       end
 
       # Generate OAuth unauthorized response

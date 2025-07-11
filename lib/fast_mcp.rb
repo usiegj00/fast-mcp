@@ -143,7 +143,7 @@ module FastMcp
   # @yield [server] A block to configure the server
   # @yieldparam server [FastMcp::Server] The server to configure
   # @return [#call] The Rack middleware
-  def self.mount_in_rails(app, options = {})
+  def self.mount_in_rails(app, options = {}, &block)
     # Default options
     name = options.delete(:name) || app.class.module_parent_name.underscore.dasherize
     version = options.delete(:version) || '1.0.0'
@@ -152,9 +152,9 @@ module FastMcp
 
     # Handle transport-specific options
     if transport_type == :legacy
-      setup_legacy_rails_transport(app, options.merge(name: name, version: version, logger: logger))
+      setup_legacy_rails_transport(app, options.merge(name: name, version: version, logger: logger), &block)
     else
-      setup_streamable_rails_transport(app, options.merge(name: name, version: version, logger: logger), transport_type)
+      setup_streamable_rails_transport(app, options.merge(name: name, version: version, logger: logger), transport_type, &block)
     end
   end
 
@@ -167,7 +167,7 @@ module FastMcp
     :streamable_http # Default to modern transport
   end
 
-  def self.setup_legacy_rails_transport(app, options)
+  def self.setup_legacy_rails_transport(app, options, &block)
     # Legacy transport setup with deprecation warning
     warn_rails_legacy_usage
 
@@ -206,7 +206,7 @@ module FastMcp
     )
   end
 
-  def self.setup_streamable_rails_transport(app, options, transport_type)
+  def self.setup_streamable_rails_transport(app, options, transport_type, &block)
     path = options.delete(:path) || '/mcp'
     allowed_origins = options[:allowed_origins] || default_rails_allowed_origins(app)
     allowed_ips = options[:allowed_ips] || ['127.0.0.1', '::1', '::ffff:127.0.0.1']
