@@ -45,8 +45,10 @@ module FastMcp
         @app = app
         @path = options[:path] || DEFAULT_PATH
         @allowed_origins = options[:allowed_origins] || DEFAULT_ALLOWED_ORIGINS
-        @bypass_origin_validation = options[:bypass_origin_validation] || false        @localhost_only = options.fetch(:localhost_only, true)
-        @bypass_protocol_validation = options[:bypass_protocol_validation] || false        @allowed_ips = options[:allowed_ips] || DEFAULT_ALLOWED_IPS
+        @bypass_origin_validation = options[:bypass_origin_validation] || false
+        @localhost_only = options.fetch(:localhost_only, true)
+        @bypass_protocol_validation = options[:bypass_protocol_validation] || false
+        @allowed_ips = options[:allowed_ips] || DEFAULT_ALLOWED_IPS
         @sse_clients = Concurrent::Hash.new
         @sessions = Concurrent::Hash.new
         @sse_clients_mutex = Mutex.new
@@ -588,7 +590,8 @@ module FastMcp
 
       # Validate Origin header (DNS rebinding protection)
       def validate_origin(request, env)
-        return true if @bypass_origin_validation        origin = env['HTTP_ORIGIN']
+        return true if @bypass_origin_validation
+        origin = env['HTTP_ORIGIN']
         origin = env['HTTP_REFERER'] || request.host if origin.nil? || origin.empty?
 
         hostname = extract_hostname(origin)
@@ -631,7 +634,8 @@ module FastMcp
 
       # Validate MCP protocol version header (required in 2025-06-18)
       def validate_protocol_version_header(request)
-        return true if @bypass_protocol_validation        version = request.get_header('HTTP_MCP_PROTOCOL_VERSION')
+        return true if @bypass_protocol_validation
+        version = request.get_header('HTTP_MCP_PROTOCOL_VERSION')
         return true if version.nil? || version.empty?
 
         unless version == PROTOCOL_VERSION
