@@ -161,7 +161,9 @@ module FastMcp
       end
     end
 
-    attr_accessor :context    def initialize(headers: {})
+    attr_accessor :context
+
+    def initialize(headers: {})
       @_meta = {}
       @headers = headers
     end
